@@ -15,9 +15,12 @@ from tqdm import tqdm
 
 
 class MultiChannelResNet50(nn.Module):
-    """ResNet-50 adapted for multi-channel immunofluorescence images."""
+    """ResNet-50 adapted for multi-channel immunofluorescence images.
     
-    def __init__(self, n_channels=4, pretrained=True):
+    Supports arbitrary number of input channels, optimized for ROSIE's 50-channel output.
+    """
+    
+    def __init__(self, n_channels=50, pretrained=True):
         super(MultiChannelResNet50, self).__init__()
         
         # Load pretrained ResNet-50
@@ -34,16 +37,27 @@ class MultiChannelResNet50(nn.Module):
             bias=original_conv1.bias
         )
         
+        # Initialize weights for multi-channel input
         if pretrained and n_channels != 3:
-            # Initialize new conv layer weights
             with torch.no_grad():
+                original_weight = original_conv1.weight  # Shape: (64, 3, 7, 7)
+                
                 if n_channels > 3:
-                    # Replicate RGB weights for additional channels
-                    weight = original_conv1.weight.repeat(1, n_channels // 3 + 1, 1, 1)[:, :n_channels, :, :]
+                    # For many channels (like ROSIE's 50), use more sophisticated initialization
+                    if n_channels >= 50:
+                        # Initialize with small random values for biological channels
+                        new_weight = torch.randn(64, n_channels, 7, 7) * 0.01
+                        # Copy RGB patterns to first 3 channels for backward compatibility
+                        new_weight[:, :3, :, :] = original_weight
+                    else:
+                        # Replicate RGB weights cyclically for moderate channel counts
+                        weight = original_weight.repeat(1, n_channels // 3 + 1, 1, 1)[:, :n_channels, :, :]
+                        new_weight = weight
                 else:
                     # Average RGB weights for fewer channels
-                    weight = original_conv1.weight.mean(dim=1, keepdim=True).repeat(1, n_channels, 1, 1)
-                self.resnet.conv1.weight = nn.Parameter(weight)
+                    new_weight = original_weight.mean(dim=1, keepdim=True).repeat(1, n_channels, 1, 1)
+                
+                self.resnet.conv1.weight = nn.Parameter(new_weight)
         
         # Remove classification layer
         self.resnet.fc = nn.Identity()
@@ -67,8 +81,8 @@ class IF2RNA(nn.Module):
         device (str): 'cpu' or 'cuda'
         bias_init (torch.Tensor): Initial bias values for final layer
     """
-    def __init__(self, input_dim, output_dim,
-                 layers=[1], nonlin=nn.ReLU(), ks=[10],
+    def __init__(self, input_dim=2048, output_dim=18815,
+                 layers=[1024, 512], nonlin=nn.ReLU(), ks=[10],
                  dropout=0.5, device='cpu',
                  bias_init=None, **kwargs):
         super(IF2RNA, self).__init__()
@@ -328,3 +342,49 @@ def fit(model,
     writer.close()
 
     return preds, labels
+
+
+# Factory functions for different configurations
+
+def create_if2rna_model_6_channel(n_genes=18815, device='cpu'):
+    """Create IF2RNA model optimized for 6-channel simulated IF (current approach)."""
+    feature_extractor = MultiChannelResNet50(n_channels=6, pretrained=True)
+    model = IF2RNA(
+        input_dim=2048,
+        output_dim=n_genes,
+        layers=[1024, 512],
+        device=device
+    )
+    return feature_extractor, model
+
+
+def create_if2rna_model_50_channel(n_genes=18815, device='cpu'):
+    """Create IF2RNA model optimized for 50-channel ROSIE IF (future approach)."""
+    feature_extractor = MultiChannelResNet50(n_channels=50, pretrained=True)
+    model = IF2RNA(
+        input_dim=2048,
+        output_dim=n_genes,
+        layers=[1024, 512],  # Deeper layers for richer 50-channel input
+        dropout=0.3,  # Lower dropout since 50 channels provide more information
+        device=device
+    )
+    return feature_extractor, model
+
+
+def create_complete_if2rna_pipeline(n_channels=50, n_genes=18815, device='cpu'):
+    """Create complete IF2RNA pipeline with feature extractor and gene predictor.
+    
+    Args:
+        n_channels: Number of input IF channels (6 for current, 50 for ROSIE)
+        n_genes: Number of genes to predict (18815 for complete transcriptome)
+        device: 'cpu' or 'cuda'
+        
+    Returns:
+        Complete model ready for training/inference
+    """
+    if n_channels <= 10:
+        # Current approach with limited channels
+        return create_if2rna_model_6_channel(n_genes, device)
+    else:
+        # Future ROSIE approach with many channels
+        return create_if2rna_model_50_channel(n_genes, device)

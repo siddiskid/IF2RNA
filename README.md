@@ -6,15 +6,19 @@ Predicting Spatial Gene Expression from Immunofluorescence Imaging using Deep Le
 
 IF2RNA is a deep learning framework for predicting whole-slide gene expression from immunofluorescence (IF) images using paired GeoMx Digital Spatial Profiler data. The model extends the HE2RNA approach to work with multi-channel IF imaging and spatial transcriptomics data across multiple organ types.
 
-### 🎉 Recent Update: Real Data Integration
+### 🎉 Major Updates
 
-**Now using real GeoMx gene expression data!**
-- ✅ Downloaded GSE289483 (pulmonary cancer, 114 ROIs, 18,815 genes)
-- ✅ Created parser for GeoMx CSV/PKC file formats
-- ✅ Hybrid approach: Real expression + biologically realistic simulated IF images
-- ✅ Training-ready dataset with 1,824 samples (16 tiles per ROI)
+**✅ Real Data Integration Complete**
+- Downloaded GSE289483 (pulmonary cancer, 114 ROIs, 18,815 genes)
+- Real GeoMx expression + biologically realistic simulated IF images
+- Training-ready dataset with 1,824 samples (16 tiles per ROI)
 
-See [Real Data Integration Summary](docs/Real_Data_Integration_Summary.md) for details.
+**🚀 NEW: ROSIE Model Available!**
+- 566.8 MB ConvNext model for H&E → 50-plex immunofluorescence
+- Next step: Replace simulated IF with ROSIE-generated realistic IF
+- Expected performance boost: r~0.2-0.3 → r~0.4-0.6
+
+See [ROSIE Integration Roadmap](docs/ROSIE_Integration_Roadmap.md) for next steps!
 
 ## Quick Start
 
@@ -147,16 +151,25 @@ University of British Columbia, Winter 2025-2026
 
 ## Roadmap
 
-- [x] HE2RNA baseline validation
+### ✅ Completed (Months 1-3)
+- [x] HE2RNA baseline validation 
 - [x] IF2RNA architecture implementation
-- [x] Real GeoMx data integration ✨ **COMPLETED**
-- [x] Simulated IF generator with tissue-specific patterns ✨ **COMPLETED**
-- [x] Hybrid dataset infrastructure ✨ **COMPLETED**
-- [ ] Model training on real expression data (in progress)
-- [ ] Multi-organ training (5+ tissue types)
-- [ ] ROSIE integration for H&E→IF generation
-- [ ] Contact authors for real IF images
+- [x] Real GeoMx data integration (GSE289483, 114 ROIs, 18K genes)
+- [x] Simulated IF generator with tissue-specific patterns
+- [x] Hybrid dataset infrastructure (real expression + simulated IF)
+
+### 🚀 Current Focus (ROSIE Integration)
+- [ ] **Fix PyTorch environment** (unblocks ROSIE loading)
+- [ ] **Load ROSIE model** (566.8 MB H&E→50-plex IF)
+- [ ] **Find H&E slides** for GSE289483 samples
+- [ ] **Replace simulated IF with ROSIE-generated IF** ⚡ **MAJOR UPGRADE**
+- [ ] **Benchmark performance:** Simulated vs ROSIE IF (expect 2x improvement)
+
+### 📈 Future (Months 4-6)
+- [ ] Multi-organ training (GSE279942, GSE243408, GSE306381)
+- [ ] Contact GeoMx authors for real multi-channel IF images
 - [ ] Cross-organ generalization evaluation
+- [ ] Publication preparation
 
 ## Citation
 

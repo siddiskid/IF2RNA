@@ -20,25 +20,102 @@ class SimulatedIFGenerator:
     """
     Generates realistic multi-channel IF images with tissue-specific patterns.
     
-    Channels (standard GeoMx panel):
-    0. DAPI - nuclear stain (all cells)
-    1. CD3 - T cells
-    2. CD20 - B cells  
-    3. CD45 - pan-leukocyte
-    4. CD68 - macrophages
-    5. CK (Pan-Cytokeratin) - epithelial cells
+    Supports both 6-channel (basic) and 50-channel (ROSIE-compatible) modes.
     """
     
-    def __init__(self, image_size=224, seed=42):
+    def __init__(self, image_size=224, seed=42, n_channels=50):
         """
         Args:
             image_size: Size of generated square images
             seed: Random seed for reproducibility
+            n_channels: Number of channels (6 for basic, 50 for ROSIE-compatible)
         """
         self.image_size = image_size
         self.seed = seed
-        self.channel_names = ['DAPI', 'CD3', 'CD20', 'CD45', 'CD68', 'CK']
-        self.n_channels = len(self.channel_names)
+        self.n_channels = n_channels
+        
+        if n_channels == 6:
+            # Original 6-channel panel
+            self.channel_names = ['DAPI', 'CD3', 'CD20', 'CD45', 'CD68', 'CK']
+        elif n_channels == 50:
+            # Comprehensive 50-channel panel (ROSIE-compatible)
+            self.channel_names = self._get_50_channel_panel()
+        else:
+            # Custom channel count
+            self.channel_names = [f'Marker_{i:02d}' for i in range(n_channels)]
+            
+        self._setup_marker_properties()
+    
+    def _get_50_channel_panel(self):
+        """Return comprehensive 50-marker panel similar to ROSIE capabilities."""
+        return [
+            # Nuclear and structural (5)
+            'DAPI', 'Hoechst', 'PI', 'PCNA', 'Ki67',
+            
+            # T cell markers (8) 
+            'CD3', 'CD4', 'CD8', 'FOXP3', 'CD25', 'PD1', 'CTLA4', 'CD45RO',
+            
+            # B cell markers (4)
+            'CD20', 'CD19', 'CD79a', 'BCL6',
+            
+            # Myeloid/Macrophage markers (6)
+            'CD68', 'CD163', 'CD11b', 'CD11c', 'CD14', 'iNOS',
+            
+            # Epithelial markers (6)
+            'CK', 'EpCAM', 'E-Cadherin', 'CK7', 'CK19', 'Beta-Catenin',
+            
+            # Immune checkpoints (4)
+            'PDL1', 'LAG3', 'TIM3', 'TIGIT',
+            
+            # Angiogenesis/Endothelial (4)
+            'CD31', 'VEGF', 'CD34', 'vWF',
+            
+            # Stromal/Fibroblast (5)
+            'Vimentin', 'SMA', 'FAP', 'Collagen_I', 'Collagen_IV',
+            
+            # Proliferation/Apoptosis (4)
+            'Caspase3', 'PARP', 'p53', 'MDM2',
+            
+            # Additional functional markers (4)
+            'HER2', 'EGFR', 'c-MYC', 'BCL2'
+        ]
+    
+    def _setup_marker_properties(self):
+        """Setup biological properties for each marker type."""
+        self.marker_properties = {}
+        
+        for i, marker in enumerate(self.channel_names):
+            # Default properties
+            props = {
+                'base_intensity': 0.3,
+                'positive_fraction': 0.1,
+                'spatial_clustering': False,
+                'cell_type': 'general'
+            }
+            
+            # Specific properties based on marker biology
+            if marker in ['DAPI', 'Hoechst', 'PI']:
+                props.update({'base_intensity': 0.8, 'positive_fraction': 0.95, 'cell_type': 'nuclear'})
+            elif marker in ['CD3', 'CD4', 'CD8', 'FOXP3', 'CD25', 'PD1', 'CTLA4', 'CD45RO']:
+                props.update({'base_intensity': 0.6, 'positive_fraction': 0.15, 'spatial_clustering': True, 'cell_type': 'T_cell'})
+            elif marker in ['CD20', 'CD19', 'CD79a', 'BCL6']:
+                props.update({'base_intensity': 0.5, 'positive_fraction': 0.08, 'spatial_clustering': True, 'cell_type': 'B_cell'})
+            elif marker in ['CD68', 'CD163', 'CD11b', 'CD11c', 'CD14', 'iNOS']:
+                props.update({'base_intensity': 0.4, 'positive_fraction': 0.12, 'cell_type': 'macrophage'})
+            elif marker in ['CK', 'EpCAM', 'E-Cadherin', 'CK7', 'CK19', 'Beta-Catenin']:
+                props.update({'base_intensity': 0.7, 'positive_fraction': 0.4, 'cell_type': 'epithelial'})
+            elif marker in ['PDL1', 'LAG3', 'TIM3', 'TIGIT']:
+                props.update({'base_intensity': 0.3, 'positive_fraction': 0.05, 'cell_type': 'checkpoint'})
+            elif marker in ['CD31', 'VEGF', 'CD34', 'vWF']:
+                props.update({'base_intensity': 0.6, 'positive_fraction': 0.03, 'cell_type': 'endothelial'})
+            elif marker in ['Vimentin', 'SMA', 'FAP', 'Collagen_I', 'Collagen_IV']:
+                props.update({'base_intensity': 0.4, 'positive_fraction': 0.2, 'cell_type': 'stromal'})
+            elif marker in ['Ki67', 'PCNA']:
+                props.update({'base_intensity': 0.5, 'positive_fraction': 0.1, 'cell_type': 'proliferation'})
+            elif marker in ['Caspase3', 'PARP', 'p53', 'MDM2']:
+                props.update({'base_intensity': 0.3, 'positive_fraction': 0.05, 'cell_type': 'apoptosis'})
+                
+            self.marker_properties[marker] = props
         
     def _create_cellular_structure(self, cell_density=0.3, seed_offset=0):
         """
@@ -134,166 +211,188 @@ class SimulatedIFGenerator:
     def generate_tumor_region(self, seed_offset=0):
         """
         Generate IF image for tumor region.
-        High epithelial (CK), low immune markers.
+        High epithelial markers, low immune infiltration.
         """
         # High cell density in tumor
         dapi, cell_centers = self._create_cellular_structure(
             cell_density=0.5, seed_offset=seed_offset
         )
         
-        channels = [dapi]
+        channels = []
         
-        # CD3 (T cells) - sparse in tumor
-        channels.append(self._create_marker_channel(
-            cell_centers, base_intensity=0.3, positive_fraction=0.05,
-            spatial_clustering=True
-        ))
-        
-        # CD20 (B cells) - very sparse
-        channels.append(self._create_marker_channel(
-            cell_centers, base_intensity=0.2, positive_fraction=0.02,
-            spatial_clustering=True
-        ))
-        
-        # CD45 (leukocytes) - sparse
-        channels.append(self._create_marker_channel(
-            cell_centers, base_intensity=0.4, positive_fraction=0.08,
-            spatial_clustering=True
-        ))
-        
-        # CD68 (macrophages) - moderate
-        channels.append(self._create_marker_channel(
-            cell_centers, base_intensity=0.4, positive_fraction=0.1,
-            spatial_clustering=True
-        ))
-        
-        # CK (epithelial) - HIGH in tumor!
-        channels.append(self._create_marker_channel(
-            cell_centers, base_intensity=0.8, positive_fraction=0.7,
-            spatial_clustering=False
-        ))
+        # Generate all channels based on tissue-specific patterns
+        for i, marker in enumerate(self.channel_names):
+            if marker in ['DAPI', 'Hoechst', 'PI'] and i == 0:
+                # Use the nuclear stain we already created
+                channels.append(dapi)
+            else:
+                props = self.marker_properties[marker].copy()
+                
+                # Tissue-specific modifications for tumor
+                if props['cell_type'] == 'epithelial':
+                    props['positive_fraction'] *= 3.0  # High epithelial
+                    props['base_intensity'] *= 1.2
+                elif props['cell_type'] in ['T_cell', 'B_cell']:
+                    props['positive_fraction'] *= 0.3  # Low immune
+                    props['spatial_clustering'] = True
+                elif props['cell_type'] == 'macrophage':
+                    props['positive_fraction'] *= 0.8  # Moderate TAMs
+                elif props['cell_type'] == 'proliferation':
+                    props['positive_fraction'] *= 2.0  # High proliferation
+                elif props['cell_type'] == 'stromal':
+                    props['positive_fraction'] *= 0.5  # Reduced stroma
+                
+                # Clamp values
+                props['positive_fraction'] = min(props['positive_fraction'], 0.9)
+                props['base_intensity'] = min(props['base_intensity'], 1.0)
+                
+                channel = self._create_marker_channel(
+                    cell_centers, 
+                    props['base_intensity'],
+                    props['positive_fraction'],
+                    props['spatial_clustering']
+                )
+                channels.append(channel)
         
         return np.stack(channels, axis=0)
     
     def generate_immune_aggregate(self, seed_offset=0):
         """
         Generate IF image for immune-rich region.
-        High CD3, CD45, moderate CD20 and CD68.
+        High T cells, B cells, macrophages. Low epithelial.
         """
         dapi, cell_centers = self._create_cellular_structure(
             cell_density=0.6, seed_offset=seed_offset
         )
         
-        channels = [dapi]
+        channels = []
         
-        # CD3 - HIGH (lots of T cells)
-        channels.append(self._create_marker_channel(
-            cell_centers, base_intensity=0.8, positive_fraction=0.5,
-            spatial_clustering=True
-        ))
-        
-        # CD20 - moderate (some B cells)
-        channels.append(self._create_marker_channel(
-            cell_centers, base_intensity=0.6, positive_fraction=0.2,
-            spatial_clustering=True
-        ))
-        
-        # CD45 - HIGH (pan leukocyte)
-        channels.append(self._create_marker_channel(
-            cell_centers, base_intensity=0.9, positive_fraction=0.6,
-            spatial_clustering=False
-        ))
-        
-        # CD68 - moderate (some macrophages)
-        channels.append(self._create_marker_channel(
-            cell_centers, base_intensity=0.5, positive_fraction=0.15,
-            spatial_clustering=True
-        ))
-        
-        # CK - very low (no epithelial cells)
-        channels.append(self._create_marker_channel(
-            cell_centers, base_intensity=0.1, positive_fraction=0.05,
-            spatial_clustering=False
-        ))
+        # Generate all channels based on tissue-specific patterns
+        for i, marker in enumerate(self.channel_names):
+            if marker in ['DAPI', 'Hoechst', 'PI'] and i == 0:
+                channels.append(dapi)
+            else:
+                props = self.marker_properties[marker].copy()
+                
+                # Tissue-specific modifications for immune aggregate
+                if props['cell_type'] in ['T_cell', 'B_cell']:
+                    props['positive_fraction'] *= 4.0  # Very high immune
+                    props['base_intensity'] *= 1.3
+                    props['spatial_clustering'] = True
+                elif props['cell_type'] == 'macrophage':
+                    props['positive_fraction'] *= 2.5  # High macrophages
+                    props['spatial_clustering'] = True
+                elif props['cell_type'] == 'epithelial':
+                    props['positive_fraction'] *= 0.1  # Very low epithelial
+                elif props['cell_type'] == 'checkpoint':
+                    props['positive_fraction'] *= 3.0  # High checkpoint expression
+                elif props['cell_type'] == 'proliferation':
+                    props['positive_fraction'] *= 1.5  # Moderate proliferation
+                elif props['cell_type'] == 'stromal':
+                    props['positive_fraction'] *= 0.3  # Low stroma
+                
+                # Clamp values
+                props['positive_fraction'] = min(props['positive_fraction'], 0.9)
+                props['base_intensity'] = min(props['base_intensity'], 1.0)
+                
+                channel = self._create_marker_channel(
+                    cell_centers,
+                    props['base_intensity'], 
+                    props['positive_fraction'],
+                    props['spatial_clustering']
+                )
+                channels.append(channel)
         
         return np.stack(channels, axis=0)
     
     def generate_stroma_region(self, seed_offset=0):
         """
         Generate IF image for stromal region.
-        Low cell density, sparse immune cells, no epithelial.
+        Low cell density, high stromal markers, sparse immune.
         """
         dapi, cell_centers = self._create_cellular_structure(
             cell_density=0.2, seed_offset=seed_offset
         )
         
-        channels = [dapi]
+        channels = []
         
-        # All immune markers low to moderate
-        channels.append(self._create_marker_channel(
-            cell_centers, base_intensity=0.3, positive_fraction=0.15,
-            spatial_clustering=True
-        ))  # CD3
-        
-        channels.append(self._create_marker_channel(
-            cell_centers, base_intensity=0.2, positive_fraction=0.08,
-            spatial_clustering=True
-        ))  # CD20
-        
-        channels.append(self._create_marker_channel(
-            cell_centers, base_intensity=0.4, positive_fraction=0.2,
-            spatial_clustering=True
-        ))  # CD45
-        
-        channels.append(self._create_marker_channel(
-            cell_centers, base_intensity=0.5, positive_fraction=0.2,
-            spatial_clustering=False
-        ))  # CD68 (some macrophages)
-        
-        channels.append(self._create_marker_channel(
-            cell_centers, base_intensity=0.1, positive_fraction=0.02,
-            spatial_clustering=False
-        ))  # CK (very low)
+        for i, marker in enumerate(self.channel_names):
+            if marker in ['DAPI', 'Hoechst', 'PI'] and i == 0:
+                channels.append(dapi)
+            else:
+                props = self.marker_properties[marker].copy()
+                
+                # Tissue-specific modifications for stroma
+                if props['cell_type'] == 'stromal':
+                    props['positive_fraction'] *= 3.0  # High stromal markers
+                    props['base_intensity'] *= 1.2
+                elif props['cell_type'] in ['T_cell', 'B_cell']:
+                    props['positive_fraction'] *= 0.4  # Sparse immune
+                elif props['cell_type'] == 'epithelial':
+                    props['positive_fraction'] *= 0.05  # Very low epithelial
+                elif props['cell_type'] == 'macrophage':
+                    props['positive_fraction'] *= 0.6  # Some macrophages
+                elif props['cell_type'] == 'endothelial':
+                    props['positive_fraction'] *= 1.5  # Some vessels
+                elif props['cell_type'] == 'proliferation':
+                    props['positive_fraction'] *= 0.2  # Low proliferation
+                
+                props['positive_fraction'] = min(props['positive_fraction'], 0.9)
+                props['base_intensity'] = min(props['base_intensity'], 1.0)
+                
+                channel = self._create_marker_channel(
+                    cell_centers,
+                    props['base_intensity'],
+                    props['positive_fraction'], 
+                    props['spatial_clustering']
+                )
+                channels.append(channel)
         
         return np.stack(channels, axis=0)
     
     def generate_normal_region(self, seed_offset=0):
         """
         Generate IF image for normal tissue.
-        Moderate epithelial, sparse immune.
+        Balanced cellular composition with moderate epithelial.
         """
         dapi, cell_centers = self._create_cellular_structure(
             cell_density=0.4, seed_offset=seed_offset
         )
         
-        channels = [dapi]
+        channels = []
         
-        # Sparse immune cells
-        channels.append(self._create_marker_channel(
-            cell_centers, base_intensity=0.2, positive_fraction=0.08,
-            spatial_clustering=False
-        ))  # CD3
-        
-        channels.append(self._create_marker_channel(
-            cell_centers, base_intensity=0.15, positive_fraction=0.05,
-            spatial_clustering=False
-        ))  # CD20
-        
-        channels.append(self._create_marker_channel(
-            cell_centers, base_intensity=0.3, positive_fraction=0.12,
-            spatial_clustering=False
-        ))  # CD45
-        
-        channels.append(self._create_marker_channel(
-            cell_centers, base_intensity=0.3, positive_fraction=0.08,
-            spatial_clustering=False
-        ))  # CD68
-        
-        # Moderate epithelial (normal tissue structure)
-        channels.append(self._create_marker_channel(
-            cell_centers, base_intensity=0.5, positive_fraction=0.4,
-            spatial_clustering=False
-        ))  # CK
+        for i, marker in enumerate(self.channel_names):
+            if marker in ['DAPI', 'Hoechst', 'PI'] and i == 0:
+                channels.append(dapi)
+            else:
+                props = self.marker_properties[marker].copy()
+                
+                # Tissue-specific modifications for normal tissue
+                if props['cell_type'] == 'epithelial':
+                    props['positive_fraction'] *= 1.5  # Moderate epithelial
+                elif props['cell_type'] in ['T_cell', 'B_cell']:
+                    props['positive_fraction'] *= 0.6  # Some immune surveillance
+                elif props['cell_type'] == 'macrophage':
+                    props['positive_fraction'] *= 0.5  # Resident macrophages
+                elif props['cell_type'] == 'stromal':
+                    props['positive_fraction'] *= 0.8  # Normal stroma
+                elif props['cell_type'] == 'proliferation':
+                    props['positive_fraction'] *= 0.3  # Low proliferation
+                elif props['cell_type'] == 'checkpoint':
+                    props['positive_fraction'] *= 0.2  # Low checkpoint expression
+                elif props['cell_type'] == 'endothelial':
+                    props['positive_fraction'] *= 0.8  # Normal vasculature
+                
+                props['positive_fraction'] = min(props['positive_fraction'], 0.9)
+                props['base_intensity'] = min(props['base_intensity'], 1.0)
+                
+                channel = self._create_marker_channel(
+                    cell_centers,
+                    props['base_intensity'],
+                    props['positive_fraction'],
+                    props['spatial_clustering']
+                )
+                channels.append(channel)
         
         return np.stack(channels, axis=0)
     
@@ -379,6 +478,29 @@ def test_generator():
     batch = generator.generate_batch(test_types, return_tensor=True)
     print(f"Batch shape: {batch.shape}")
     print(f"Batch dtype: {batch.dtype}")
+
+
+# Factory functions for different configurations
+
+def create_basic_if_generator(image_size=224, seed=42):
+    """Create 6-channel IF generator (current approach)."""
+    return SimulatedIFGenerator(image_size=image_size, seed=seed, n_channels=6)
+
+
+def create_rosie_compatible_if_generator(image_size=224, seed=42):
+    """Create 50-channel IF generator (ROSIE-compatible)."""
+    return SimulatedIFGenerator(image_size=image_size, seed=seed, n_channels=50)
+
+
+def create_if_generator(n_channels=50, image_size=224, seed=42):
+    """Create IF generator with specified number of channels.
+    
+    Args:
+        n_channels: Number of channels (6 for basic, 50 for ROSIE-compatible)
+        image_size: Size of generated images
+        seed: Random seed for reproducibility
+    """
+    return SimulatedIFGenerator(image_size=image_size, seed=seed, n_channels=n_channels)
     print(f"Batch range: {batch.min():.3f} - {batch.max():.3f}")
     
     print(f"\n{'='*60}")
