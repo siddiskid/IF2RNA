@@ -1,7 +1,4 @@
-"""
-Hybrid Dataset for IF2RNA Training
-Combines REAL GeoMx gene expression with SIMULATED IF images
-"""
+
 
 import numpy as np
 import torch
@@ -13,19 +10,8 @@ logger = logging.getLogger(__name__)
 
 
 class HybridIF2RNADataset(Dataset):
-    """
-    PyTorch dataset combining:
-    - Real gene expression from GeoMx (downloaded from GEO)
-    - Simulated IF images based on tissue type annotations
-    """
     
     def __init__(self, integrated_data, if_generator, n_tiles_per_roi=16):
-        """
-        Args:
-            integrated_data: Output from RealGeoMxDataParser.get_integrated_data()
-            if_generator: SimulatedIFGenerator instance
-            n_tiles_per_roi: Number of image tiles per ROI (for data augmentation)
-        """
         self.roi_ids = integrated_data['roi_ids']
         self.gene_expression = integrated_data['gene_expression']  # DataFrame or array
         self.gene_names = integrated_data['gene_names']
@@ -59,17 +45,6 @@ class HybridIF2RNADataset(Dataset):
         return self.total_samples
     
     def __getitem__(self, idx):
-        """
-        Get one sample (IF image + gene expression).
-        
-        Returns:
-            dict with:
-                - 'image': torch.Tensor of shape (n_channels, H, W)
-                - 'expression': torch.Tensor of shape (n_genes,)
-                - 'roi_id': int
-                - 'tile_id': int (which tile within ROI)
-                - 'tissue_type': str
-        """
         # Map flat index to (roi, tile)
         roi_idx = idx // self.n_tiles_per_roi
         tile_idx = idx % self.n_tiles_per_roi
@@ -218,75 +193,61 @@ def test_hybrid_dataset():
     # Load real data
     from pathlib import Path
     import sys
-    sys.path.append('/Users/siddarthchilukuri/Documents/GitHub/IF2RNA/src')
+    # Add src to path relative to this file
+    sys.path.append(str(Path(__file__).parent.parent))
     
     from if2rna.real_geomx_parser import RealGeoMxDataParser
     from if2rna.simulated_if_generator import SimulatedIFGenerator
     
-    data_dir = Path("/Users/siddarthchilukuri/Documents/GitHub/IF2RNA/data/geomx_datasets/GSE289483")
+    # Use relative path
+    data_dir = Path(__file__).parent.parent.parent / "data" / "geomx_datasets" / "GSE289483"
     
     # Parse real data
-    print("\n1. Loading real GeoMx data...")
+    print("Loading GeoMx data...")
     parser = RealGeoMxDataParser(data_dir)
     parser.load_raw_counts()
     parser.load_processed_expression()
     parser.create_metadata()
     integrated = parser.get_integrated_data(use_processed=True, n_genes=1000)
     
-    print(f"   Loaded {integrated['metadata']['n_rois']} ROIs, "
-          f"{integrated['metadata']['n_genes']} genes")
+    print(f"Loaded {integrated['metadata']['n_rois']} ROIs, {integrated['metadata']['n_genes']} genes")
     
     # Create IF generator
-    print("\n2. Creating IF generator...")
+    print("Creating IF generator...")
     if_generator = SimulatedIFGenerator(image_size=224, seed=42)
     
     # Create tile-level dataset
-    print("\n3. Creating tile-level dataset...")
+    print("Creating tile dataset...")
     tile_dataset = HybridIF2RNADataset(
         integrated_data=integrated,
         if_generator=if_generator,
         n_tiles_per_roi=16
     )
     
-    print(f"   Total samples: {len(tile_dataset)}")
+    print(f"Total samples: {len(tile_dataset)}")
     
     # Test getting one sample
-    print("\n4. Getting sample...")
     sample = tile_dataset[0]
-    print(f"   Image shape: {sample['image'].shape}")
-    print(f"   Expression shape: {sample['expression'].shape}")
-    print(f"   ROI: {sample['roi_name']}")
-    print(f"   Tissue: {sample['tissue_type']}")
-    print(f"   Expression range: {sample['expression'].min():.2f} - {sample['expression'].max():.2f}")
+    print(f"Sample: {sample['image'].shape}, {sample['tissue_type']}")
     
     # Create aggregated dataset
-    print("\n5. Creating aggregated dataset...")
+    print("Creating aggregated dataset...")
     agg_dataset = AggregatedIF2RNADataset(
         integrated_data=integrated,
         if_generator=if_generator,
         n_tiles_per_roi=16
     )
     
-    print(f"   Total ROIs: {len(agg_dataset)}")
+    print(f"Total ROIs: {len(agg_dataset)}")
     
     agg_sample = agg_dataset[0]
-    print(f"   Tiles shape: {agg_sample['tiles'].shape}")
-    print(f"   Expression shape: {agg_sample['expression'].shape}")
+    print(f"Agg sample: {agg_sample['tiles'].shape}")
     
     # Test train/val split
-    print("\n6. Testing train/val split...")
     train_ds, val_ds = create_train_val_split(tile_dataset, val_fraction=0.2, seed=42)
-    print(f"   Train: {len(train_ds)} samples")
-    print(f"   Val: {len(val_ds)} samples")
+    print(f"Split: {len(train_ds)} train, {len(val_ds)} val")
     
-    print("\n" + "="*60)
-    print("✅ Hybrid dataset test complete!")
-    print("="*60)
-    print("\n🎉 SUCCESS: Real gene expression + Simulated IF images!")
-    print("   - Real data: 114 ROIs, 1000 genes from GSE289483")
-    print("   - Simulated: 6-channel IF images (224x224)")
-    print("   - Ready for IF2RNA training!")
-    print("="*60)
+    print("Test complete")
 
 
 if __name__ == '__main__':

@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-"""
-IF2RNA Real Data Training Test: Validate with TCGA-like data structure
-"""
 
 import sys
 import torch
@@ -306,10 +303,10 @@ def run_real_data_training_test():
     if len(gene_corrs) > 0:
         mean_corr = np.mean(gene_corrs)
         if mean_corr > 0.1:  # Reasonable threshold for realistic data
-            print(f"\n🎉 SUCCESS: Mean correlation {mean_corr:.4f} > 0.1")
+            print(f"Mean correlation: {mean_corr:.4f}")
             success = True
         else:
-            print(f"\n⚠️  MARGINAL: Mean correlation {mean_corr:.4f} (expected for synthetic data)")
+            print(f"Mean correlation {mean_corr:.4f}")
             success = True  # Still success, just synthetic data
     else:
         print(f"\n✗ FAILED: No valid correlations computed")

@@ -1,6 +1,4 @@
-"""
-IF2RNA: Model architecture adapted from HE2RNA for gene expression prediction
-"""
+
 
 import numpy as np
 import torch
@@ -15,18 +13,11 @@ from tqdm import tqdm
 
 
 class MultiChannelResNet50(nn.Module):
-    """ResNet-50 adapted for multi-channel immunofluorescence images.
-    
-    Supports arbitrary number of input channels, optimized for ROSIE's 50-channel output.
-    """
     
     def __init__(self, n_channels=50, pretrained=True):
         super(MultiChannelResNet50, self).__init__()
         
-        # Load pretrained ResNet-50
         self.resnet = models.resnet50(pretrained=pretrained)
-        
-        # Replace first conv layer for multi-channel input
         original_conv1 = self.resnet.conv1
         self.resnet.conv1 = nn.Conv2d(
             n_channels, 
@@ -37,29 +28,22 @@ class MultiChannelResNet50(nn.Module):
             bias=original_conv1.bias
         )
         
-        # Initialize weights for multi-channel input
         if pretrained and n_channels != 3:
             with torch.no_grad():
-                original_weight = original_conv1.weight  # Shape: (64, 3, 7, 7)
+                original_weight = original_conv1.weight
                 
                 if n_channels > 3:
-                    # For many channels (like ROSIE's 50), use more sophisticated initialization
                     if n_channels >= 50:
-                        # Initialize with small random values for biological channels
                         new_weight = torch.randn(64, n_channels, 7, 7) * 0.01
-                        # Copy RGB patterns to first 3 channels for backward compatibility
                         new_weight[:, :3, :, :] = original_weight
                     else:
-                        # Replicate RGB weights cyclically for moderate channel counts
                         weight = original_weight.repeat(1, n_channels // 3 + 1, 1, 1)[:, :n_channels, :, :]
                         new_weight = weight
                 else:
-                    # Average RGB weights for fewer channels
                     new_weight = original_weight.mean(dim=1, keepdim=True).repeat(1, n_channels, 1, 1)
                 
                 self.resnet.conv1.weight = nn.Parameter(new_weight)
         
-        # Remove classification layer
         self.resnet.fc = nn.Identity()
         
     def forward(self, x):
@@ -67,20 +51,6 @@ class MultiChannelResNet50(nn.Module):
 
 
 class IF2RNA(nn.Module):
-    """Model that generates one score per tile and per predicted gene.
-    
-    Adapted from HE2RNA for immunofluorescence imaging.
-
-    Args
-        input_dim (int): Input feature dimension (e.g., 2048 for ResNet-50)
-        output_dim (int): Output dimension, must match the number of genes to predict
-        layers (list): List of the layers' dimensions
-        nonlin (torch.nn.modules.activation): Activation function
-        ks (list): List of numbers of highest-scored tiles to keep in each channel
-        dropout (float): Dropout rate
-        device (str): 'cpu' or 'cuda'
-        bias_init (torch.Tensor): Initial bias values for final layer
-    """
     def __init__(self, input_dim=2048, output_dim=18815,
                  layers=[1024, 512], nonlin=nn.ReLU(), ks=[10],
                  dropout=0.5, device='cpu',
@@ -136,7 +106,6 @@ class IF2RNA(nn.Module):
 
 
 def training_epoch(model, dataloader, optimizer):
-    """Train model for one epoch."""
     model.train()
     loss_fn = nn.MSELoss()
     train_loss = []
@@ -154,7 +123,6 @@ def training_epoch(model, dataloader, optimizer):
 
 
 def compute_correlations(labels, preds, projects):
-    """Compute correlation metrics across projects."""
     metrics = []
     for project in np.unique(projects):
         for i in range(labels.shape[1]):
@@ -167,7 +135,6 @@ def compute_correlations(labels, preds, projects):
 
 
 def evaluate(model, dataloader, projects):
-    """Evaluate the model on the validation set and return loss and metrics."""
     model.eval()
     loss_fn = nn.MSELoss()
     valid_loss = []
@@ -188,7 +155,6 @@ def evaluate(model, dataloader, projects):
 
 
 def predict(model, dataloader):
-    """Perform prediction on the test set."""
     model.eval()
     labels = []
     preds = []
@@ -211,19 +177,6 @@ def fit(model,
         test_set=None,
         path=None,
         logdir='./exp'):
-    """Fit the model and make prediction on evaluation set.
-
-    Args:
-        model (nn.Module): The IF2RNA model
-        train_set (torch.utils.data.Dataset): Training dataset
-        valid_set (torch.utils.data.Dataset): Validation dataset
-        valid_projects (np.array): Project IDs for validation samples
-        params (dict): Training parameters
-        optimizer (torch.optim.Optimizer): Optimizer for training
-        test_set (torch.utils.data.Dataset): Test dataset
-        path (str): Path to save model
-        logdir (str): Path for TensorboardX logs
-    """
 
     if path is not None and not os.path.exists(path):
         os.mkdir(path)
@@ -263,7 +216,7 @@ def fit(model,
     if valid_set is not None:
         valid_loss, best = evaluate(
             model, valid_loader, valid_projects)
-        print('{}: {:.3f}'.format(metrics, best))
+        print(f'{metrics}: {best:.3f}')
         if np.isnan(best):
             best = 0
         if test_set is not None:
@@ -280,10 +233,7 @@ def fit(model,
             train_loss = training_epoch(model, train_loader, optimizer)
             dic_loss = {'train_loss': train_loss}
 
-            print('Epoch {}/{} - {:.2f}s'.format(
-                e + 1,
-                max_epochs,
-                time.time() - start_time))
+            print(f'Epoch {e + 1}/{max_epochs} - {time.time() - start_time:.2f}s')
             start_time = time.time()
 
             if valid_set is not None:
@@ -295,15 +245,13 @@ def fit(model,
                                    dic_loss,
                                    e)
                 writer.add_scalar('data/metrics', score, e)
-                print('loss: {:.4f}, val loss: {:.4f}'.format(
-                    train_loss,
-                    valid_loss))
-                print('{}: {:.3f}'.format(metrics, score))
+                print(f'loss: {train_loss:.4f}, val loss: {valid_loss:.4f}')
+                print(f'{metrics}: {score:.3f}')
             else:
                 writer.add_scalars('data/losses',
                                    dic_loss,
                                    e)
-                print('loss: {:.4f}'.format(train_loss))
+                print(f'loss: {train_loss:.4f}')
 
             if valid_set is not None:
                 criterion = (score > best)
@@ -319,7 +267,7 @@ def fit(model,
                         preds, labels = predict(model, valid_loader)
 
                 if epoch_since_best == patience:
-                    print('Early stopping at epoch {}'.format(e + 1))
+                    print(f'Early stopping at epoch {e + 1}')
                     break
 
     except KeyboardInterrupt:
@@ -347,7 +295,6 @@ def fit(model,
 # Factory functions for different configurations
 
 def create_if2rna_model_6_channel(n_genes=18815, device='cpu'):
-    """Create IF2RNA model optimized for 6-channel simulated IF (current approach)."""
     feature_extractor = MultiChannelResNet50(n_channels=6, pretrained=True)
     model = IF2RNA(
         input_dim=2048,
@@ -359,32 +306,19 @@ def create_if2rna_model_6_channel(n_genes=18815, device='cpu'):
 
 
 def create_if2rna_model_50_channel(n_genes=18815, device='cpu'):
-    """Create IF2RNA model optimized for 50-channel ROSIE IF (future approach)."""
     feature_extractor = MultiChannelResNet50(n_channels=50, pretrained=True)
     model = IF2RNA(
         input_dim=2048,
         output_dim=n_genes,
-        layers=[1024, 512],  # Deeper layers for richer 50-channel input
-        dropout=0.3,  # Lower dropout since 50 channels provide more information
+        layers=[1024, 512],
+        dropout=0.3,
         device=device
     )
     return feature_extractor, model
 
 
 def create_complete_if2rna_pipeline(n_channels=50, n_genes=18815, device='cpu'):
-    """Create complete IF2RNA pipeline with feature extractor and gene predictor.
-    
-    Args:
-        n_channels: Number of input IF channels (6 for current, 50 for ROSIE)
-        n_genes: Number of genes to predict (18815 for complete transcriptome)
-        device: 'cpu' or 'cuda'
-        
-    Returns:
-        Complete model ready for training/inference
-    """
     if n_channels <= 10:
-        # Current approach with limited channels
         return create_if2rna_model_6_channel(n_genes, device)
     else:
-        # Future ROSIE approach with many channels
         return create_if2rna_model_50_channel(n_genes, device)

@@ -1,6 +1,4 @@
-"""
-IF2RNA: Data handling and dataset classes adapted from HE2RNA
-"""
+
 
 import os
 import numpy as np
@@ -24,7 +22,6 @@ from joblib import Parallel, delayed
 
 
 def load_labels(transcriptome_dataset):
-    """Clean up gene expression data and return labels, genes and patients."""
     assert hasattr(transcriptome_dataset, 'transcriptomes'), \
         "Transcriptomes have not been loaded for this dataset"
 
@@ -41,9 +38,8 @@ def load_labels(transcriptome_dataset):
 
 
 def load_and_aggregate_file(file, reduce=True):
-    """Load and aggregate individual numpy file."""
     x = np.load(file)
-    x = x[:, 3:]  # Remove coordinates
+    x = x[:, 3:]
     if reduce:
         x = np.mean(x, axis=0)
     else:
@@ -52,19 +48,12 @@ def load_and_aggregate_file(file, reduce=True):
 
 
 def load_npy_data(file_list, reduce=True):
-    """Load and aggregate data saved as npy files.
-
-    Args
-        reduce (bool): If True, perform mean pooling on slide.
-            Else, pad every slide with zeros.
-    """
     X = np.array(Parallel(n_jobs=16)(delayed(load_and_aggregate_file)(file) 
                                      for file in tqdm(file_list)))
     return X
 
 
 def make_dataset(dir, file_list, labels):
-    """Associate file names and labels."""
     images = []
     dir = os.path.expanduser(dir)
 
@@ -78,13 +67,6 @@ def make_dataset(dir, file_list, labels):
 
 
 class IF2RNADataset(TensorDataset):
-    """Dataset class for IF2RNA whole-slide analysis with aggregated data.
-
-    Args:
-        genes (list): List of gene IDs to be used as targets
-        patients (list): List of patient IDs for patient-based splits
-        projects (list): List of project IDs for cross-validation
-    """
     def __init__(self, genes, patients, projects, *tensors):
         super(IF2RNADataset, self).__init__(*tensors)
         self.genes = genes
@@ -94,12 +76,6 @@ class IF2RNADataset(TensorDataset):
 
     @classmethod
     def from_transcriptome_data(cls, transcriptome_dataset, tiles_path):
-        """Create dataset from transcriptome data and corresponding image tiles.
-
-        Args:
-            transcriptome_dataset: Dataset containing gene expression data
-            tiles_path (str): Path to directory containing tile features
-        """
         y, cols, patients, projects = load_labels(transcriptome_dataset)
 
         file_list = [
@@ -114,7 +90,6 @@ class IF2RNADataset(TensorDataset):
 
 
 class ToTensor(object):
-    """Transform numpy array to torch tensor with proper padding."""
     def __init__(self, n_tiles=8000):
         self.n_tiles = n_tiles
 
@@ -128,25 +103,11 @@ class ToTensor(object):
 
 
 class RemoveCoordinates(object):
-    """Remove tile coordinates from features."""
     def __call__(self, sample):
         return sample[3:]
 
 
 class IF2RNATileDataset(Dataset):
-    """Dataset class for tile-level IF2RNA data processing.
-
-    Args:
-        genes (list): List of gene IDs to be used as targets
-        patients (list): List of patient IDs for patient split
-        projects (list): List of project IDs
-        projectname (str): Name of the current project
-        file_list (list): List of paths to .npy files containing tiled slides
-        labels (list or np.array): Associated gene expression values
-        transform (callable): Data preprocessing
-        target_transform (callable): Target preprocessing
-        masks (dict): Optional attention masks for tiles
-    """
     def __init__(self, genes, patients, projects, projectname, file_list, labels,
                  tiles_root_path,
                  transform=None,
@@ -172,12 +133,6 @@ class IF2RNATileDataset(Dataset):
 
     @classmethod
     def from_transcriptome_data(cls, transcriptome_dataset, tiles_root_path):
-        """Create dataset from transcriptome data.
-        
-        Args:
-            transcriptome_dataset: Dataset containing gene expression data
-            tiles_root_path (str): Root path to tile features
-        """
         projectname = transcriptome_dataset.projectname
         labels, cols, patients, projects = load_labels(transcriptome_dataset)
         file_list = [
@@ -207,7 +162,6 @@ class IF2RNATileDataset(Dataset):
 
 
 class IFDataset(Dataset):
-    """Dataset class for immunofluorescence whole-slide analysis."""
     
     def __init__(self, genes, patients, projects, if_features, labels):
         self.genes = genes
@@ -225,12 +179,10 @@ class IFDataset(Dataset):
     
     @classmethod
     def from_if_data(cls, if_images, gene_expression, genes, patients, projects):
-        """Create dataset from IF images and gene expression data."""
         return cls(genes, patients, projects, if_images, gene_expression)
 
 
 class IFTileTransform:
-    """Transform for IF tile preprocessing."""
     
     def __init__(self, n_tiles=8000, normalize=True):
         self.n_tiles = n_tiles
@@ -253,7 +205,6 @@ class IFTileTransform:
 
 
 def load_multichannel_image(file_path):
-    """Load multi-channel immunofluorescence image."""
     file_path = Path(file_path) if not isinstance(file_path, Path) else file_path
     
     if file_path.suffix.lower() in ['.tif', '.tiff'] and TIFFFILE_AVAILABLE:
@@ -270,7 +221,6 @@ def load_multichannel_image(file_path):
 
 
 def normalize_if_channels(img, method='percentile'):
-    """Normalize immunofluorescence channels."""
     if method == 'percentile':
         for i in range(img.shape[-1]):
             p1, p99 = np.percentile(img[..., i], [1, 99])
@@ -285,29 +235,22 @@ def normalize_if_channels(img, method='percentile'):
 
 def create_synthetic_if_data(n_samples=100, n_tiles=1000, n_channels=4, 
                            tile_size=224, n_genes=100):
-    """Create synthetic multi-channel IF data."""
     np.random.seed(42)
     torch.manual_seed(42)
     
-    # Channel definitions: DAPI, CD3, CD20, autofluorescence
     channel_names = ['DAPI', 'CD3', 'CD20', 'AF'] if n_channels == 4 else [f'Ch{i}' for i in range(n_channels)]
     
     X = []
     for _ in range(n_samples):
-        # Generate 2048-dimensional features per tile (ResNet output dimension)
         sample_tiles = np.random.randn(2048, n_tiles)
         
-        # Add channel-specific patterns
-        # DAPI channel influence - uniform nuclear staining
         dapi_pattern = np.random.rand(n_tiles) * 0.3 + 0.7
         sample_tiles[:512] *= dapi_pattern.reshape(1, -1)
         
-        # CD3 channel influence - sparse T-cell regions
         if n_channels > 1:
             cd3_mask = np.random.rand(n_tiles) > 0.8
             sample_tiles[512:1024] *= cd3_mask.reshape(1, -1) * 2
         
-        # CD20 channel influence - sparse B-cell regions  
         if n_channels > 2:
             cd20_mask = np.random.rand(n_tiles) > 0.85
             sample_tiles[1024:1536] *= cd20_mask.reshape(1, -1) * 1.5
@@ -317,11 +260,9 @@ def create_synthetic_if_data(n_samples=100, n_tiles=1000, n_channels=4,
     X = np.array(X)
     X = torch.tensor(X, dtype=torch.float32)
     
-    # Generate gene expression with IF-specific patterns
     y = torch.randn(n_samples, n_genes) * 2 + 5
     y = torch.relu(y)
     
-    # Create immune-related gene correlations
     immune_genes = n_genes // 4
     for i in range(immune_genes):
         if n_channels > 1:
@@ -335,31 +276,13 @@ def create_synthetic_if_data(n_samples=100, n_tiles=1000, n_channels=4,
 
 
 def create_synthetic_data(n_samples=100, n_tiles=1000, feature_dim=2048, n_genes=100):
-    """Create synthetic data for testing IF2RNA model.
-    
-    Args:
-        n_samples (int): Number of samples
-        n_tiles (int): Number of tiles per sample
-        feature_dim (int): Feature dimension (ResNet features)
-        n_genes (int): Number of genes to predict
-    
-    Returns:
-        X (torch.Tensor): Synthetic tile features [n_samples, feature_dim, n_tiles]
-        y (torch.Tensor): Synthetic gene expression [n_samples, n_genes]
-        patients (list): Patient IDs
-        projects (list): Project IDs
-    """
     np.random.seed(42)
     torch.manual_seed(42)
     
-    # Generate synthetic tile features
     X = torch.randn(n_samples, feature_dim, n_tiles)
     
-    # Generate synthetic gene expression (log-normalized)
-    y = torch.randn(n_samples, n_genes) * 2 + 5  # Mean around 5, std of 2
-    y = torch.relu(y)  # Ensure non-negative
-    
-    # Generate patient and project IDs
+    y = torch.randn(n_samples, n_genes) * 2 + 5
+    y = torch.relu(y)
     patients = [f"patient_{i:03d}" for i in range(n_samples)]
     projects = np.random.choice(['TCGA-BRCA', 'TCGA-LUAD', 'TCGA-COAD'], n_samples)
     

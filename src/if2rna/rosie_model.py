@@ -1,7 +1,4 @@
-"""
-ROSIE Model Integration for IF2RNA
-Generates realistic immunofluorescence from H&E histology slides
-"""
+
 
 import torch
 import torch.nn as nn
@@ -16,39 +13,22 @@ logger = logging.getLogger(__name__)
 
 
 class ROSIEModel:
-    """
-    Wrapper for ROSIE H&E to IF model.
-    
-    ROSIE generates 50-plex immunofluorescence from H&E slides.
-    We extract 6 channels relevant for IF2RNA: DAPI, CD3, CD20, CD45, CD68, CK.
-    """
     
     def __init__(self, model_path: Union[str, Path] = "ROSIE.pth", device: str = "auto"):
-        """
-        Initialize ROSIE model.
-        
-        Args:
-            model_path: Path to ROSIE model checkpoint
-            device: Device to run model on ('cuda', 'cpu', or 'auto')
-        """
         self.model_path = Path(model_path)
         self.device = self._setup_device(device)
         
-        # Channel mapping from ROSIE 50-plex to our 6 channels
-        # Note: These indices are placeholders and need to be updated
-        # based on actual ROSIE model output channels
         self.channel_mapping = {
-            'DAPI': 0,      # Nuclear stain (often reconstructed)
-            'CD3': 12,      # T cell marker  
-            'CD20': 23,     # B cell marker
-            'CD45': 34,     # Pan-leukocyte marker
-            'CD68': 41,     # Macrophage marker
-            'CK': 47        # Pan-Cytokeratin (epithelial)
+            'DAPI': 0,
+            'CD3': 12,
+            'CD20': 23,
+            'CD45': 34,
+            'CD68': 41,
+            'CK': 47
         }
         
         self.channel_names = list(self.channel_mapping.keys())
         
-        # Model will be loaded on first use (lazy loading)
         self.model = None
         self._model_loaded = False
         
@@ -56,7 +36,6 @@ class ROSIEModel:
         logger.info(f"Model path: {self.model_path}")
         
     def _setup_device(self, device: str) -> torch.device:
-        """Setup computation device"""
         if device == "auto":
             device = "cuda" if torch.cuda.is_available() else "cpu"
         
@@ -69,36 +48,28 @@ class ROSIEModel:
         return torch_device
     
     def _load_model(self) -> nn.Module:
-        """Load ROSIE model from checkpoint file"""
         if not self.model_path.exists():
             raise FileNotFoundError(f"ROSIE model not found: {self.model_path}")
             
         logger.info(f"Loading ROSIE model from {self.model_path}")
         
         try:
-            # Try loading the checkpoint
             checkpoint = torch.load(self.model_path, map_location=self.device)
-            
-            # Handle different checkpoint formats
             if isinstance(checkpoint, dict):
                 if 'model' in checkpoint:
                     model = checkpoint['model']
                     logger.info("Loaded model from checkpoint['model']")
                 elif 'state_dict' in checkpoint:
-                    # Need to reconstruct architecture - this requires knowing ROSIE's exact architecture
                     logger.error("State dict format detected, but model architecture unknown")
                     logger.error("Please provide the complete ROSIE model or architecture details")
                     raise NotImplementedError("State dict loading requires model architecture definition")
                 else:
-                    # Try to use checkpoint directly
                     model = checkpoint
                     logger.info("Loaded model directly from checkpoint")
             else:
-                # Direct model save
                 model = checkpoint
                 logger.info("Loaded model directly")
             
-            # Move to device and set to eval mode
             model = model.to(self.device)
             model.eval()
             
@@ -342,7 +313,7 @@ class ROSIEIFGenerator:
                 he_image = self.load_he_image(he_path)
                 if_image = self.rosie.generate_if_6channel(he_image)
                 
-                logger.info(f"✅ Generated ROSIE IF for ROI {roi_id} from {he_path.name}")
+                logger.info(f"Generated ROSIE IF for ROI {roi_id} from {he_path.name}")
                 return if_image
                 
             except Exception as e:
@@ -351,7 +322,7 @@ class ROSIEIFGenerator:
         
         # Fallback to simulation
         if self.fallback_generator is not None and tissue_type is not None:
-            logger.warning(f"⚠️ No H&E found for ROI {roi_id}, using simulated IF")
+            logger.warning(f"No H&E found for ROI {roi_id}, using simulated IF")
             return self.fallback_generator.generate_for_tissue_type(tissue_type, seed_offset=seed_offset)
         else:
             raise RuntimeError(f"No H&E image found for ROI {roi_id} and no fallback available")
@@ -404,12 +375,12 @@ def test_rosie_model(model_path: str = "ROSIE.pth"):
     
     try:
         # Test model loading
-        print("\n1. Loading ROSIE model...")
+        print("Loading ROSIE...")
         rosie = ROSIEModel(model_path)
         
         # Get model info before loading
         info = rosie.get_model_info()
-        print(f"   Initial status: {info['status']}")
+        print(f"Status: {info['status']}")
         
         # Test with dummy H&E image
         print("\n2. Testing with dummy H&E image...")
@@ -417,18 +388,15 @@ def test_rosie_model(model_path: str = "ROSIE.pth"):
         print(f"   Input H&E shape: {dummy_he.shape}")
         
         # Generate IF
-        if_image = rosie.generate_if_6channel(dummy_he)
-        print(f"   Generated IF shape: {if_image.shape}")
-        print(f"   IF value range: {if_image.min():.3f} - {if_image.max():.3f}")
+        if_image = rosie.generate_if_from_he(dummy_he)
+        print(f"Output: {if_image.shape}")
         
         # Get model info after loading
         info = rosie.get_model_info()
-        print(f"\n3. Model information:")
-        for key, value in info.items():
-            print(f"   {key}: {value}")
+        print(f"Model info: {info}")
         
         # Test IF generator
-        print(f"\n4. Testing ROSIE IF Generator...")
+        print("Testing generator...")
         generator = ROSIEIFGenerator(model_path, fallback_to_simulation=True)
         
         # Test ROI generation (will use simulation since no H&E dir)
@@ -436,21 +404,12 @@ def test_rosie_model(model_path: str = "ROSIE.pth"):
         print(f"   Generated IF shape: {test_if.shape}")
         print(f"   Channels: {generator.channel_names}")
         
-        print(f"\n{'='*60}")
-        print("✅ ROSIE model test successful!")
-        print("="*60)
+        print("Test passed")
         
         return rosie, generator
         
     except Exception as e:
-        print(f"\n❌ ROSIE model test failed: {e}")
-        print(f"{'='*60}")
-        print("Debug information:")
-        print(f"Model path exists: {Path(model_path).exists()}")
-        print(f"Model path size: {Path(model_path).stat().st_size / 1024**2:.1f} MB" if Path(model_path).exists() else "N/A")
-        print(f"PyTorch version: {torch.__version__}")
-        print(f"CUDA available: {torch.cuda.is_available()}")
-        print("="*60)
+        print(f"Test failed: {e}")
         raise
 
 

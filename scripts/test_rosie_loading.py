@@ -1,10 +1,4 @@
-"""
-Minimal ROSIE Model Loader Test
-Tests basic model loading without complex environment setup
-"""
-
 def test_rosie_loading():
-    """Test ROSIE model loading with minimal dependencies"""
     
     print("="*60)
     print("ROSIE Model Analysis")
@@ -49,7 +43,7 @@ def test_rosie_loading():
         device = torch.device("cpu")  # Force CPU to avoid GPU issues
         
         checkpoint = torch.load(model_path, map_location=device)
-        print(f"   ✅ Model loaded successfully!")
+        print("Model loaded")
         
         # Analyze checkpoint structure
         print(f"\n4. Model Analysis:")
@@ -89,7 +83,7 @@ def test_rosie_loading():
         except:
             print(f"   Could not analyze parameters")
         
-        print(f"\n✅ ROSIE Model Analysis Complete!")
+        print("Analysis complete")
         return True
         
     except ImportError as e:
@@ -106,8 +100,8 @@ if __name__ == '__main__':
     success = test_rosie_loading()
     
     if success:
-        print("\n🎉 ROSIE model is loadable and ready for integration!")
+        print("ROSIE model ready")
     else:
-        print("\n⚠️  ROSIE model analysis completed, but PyTorch loading failed.")
+        print("ROSIE model analysis completed, but PyTorch loading failed")
         print("   This is likely due to the PyTorch library issue.")
         print("   The model file itself appears to be valid.")

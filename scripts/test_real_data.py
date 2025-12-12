@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-"""
-IF2RNA Data Bridge: Connect to real-world data formats
-"""
 
 import sys
 import numpy as np
@@ -19,8 +16,7 @@ from if2rna.model import IF2RNA
 
 
 def create_sample_tcga_like_data():
-    """Create sample data mimicking TCGA structure for testing."""
-    print("Creating sample TCGA-like data structure...")
+    print("Creating sample data...")
     
     # Create sample data directory
     data_dir = Path("sample_data")
@@ -63,9 +59,7 @@ def create_sample_tcga_like_data():
     transcriptome_file = transcriptome_dir / "sample_tcga_expression.csv"
     full_df.to_csv(transcriptome_file, index=False)
     
-    print(f"✓ Sample transcriptome data: {transcriptome_file}")
-    print(f"  - Samples: {n_samples}")
-    print(f"  - Genes: {n_genes}")
+    print(f"Created transcriptome: {n_samples} samples, {n_genes} genes")
     
     # Create sample tile data
     tiles_dir = data_dir / "tiles"
@@ -91,7 +85,7 @@ def create_sample_tcga_like_data():
             slide_path = project_dir / slide_file
             np.save(slide_path, tile_data)
     
-    print(f"✓ Sample tile data created in: {tiles_dir}")
+    print(f"Created tiles in {tiles_dir}")
     
     return {
         'transcriptome_file': transcriptome_file,
@@ -103,7 +97,7 @@ def create_sample_tcga_like_data():
 
 def test_real_data_loading():
     """Test loading data in TCGA-like format."""
-    print("\nTesting real data loading...")
+    print("\nLoading data...")
     
     # Create sample data
     data_info = create_sample_tcga_like_data()
@@ -120,9 +114,8 @@ def test_real_data_loading():
     
     # Load transcriptome data
     dataset = SimpleTranscriptomeDataset(data_info['transcriptome_file'])
-    print(f"✓ Loaded transcriptome dataset")
-    print(f"  - Samples: {len(dataset.df)}")
-    print(f"  - Genes: {len([c for c in dataset.df.columns if c.startswith('ENSG')])}")
+    n_genes = len([c for c in dataset.df.columns if c.startswith('ENSG')])
+    print(f"Loaded: {len(dataset.df)} samples, {n_genes} genes")
     
     # Test data loading with IF2RNA format
     try:
@@ -136,10 +129,7 @@ def test_real_data_loading():
             file_path = f"{project_path}/0.50_mpp/{row['Slide.ID']}"
             file_list.append(file_path)
         
-        print(f"✓ Data preparation successful")
-        print(f"  - Labels shape: {y.shape}")
-        print(f"  - Patients: {len(patients)}")
-        print(f"  - Projects: {len(set(projects))}")
+        print(f"Data ready: {y.shape}, {len(patients)} patients, {len(set(projects))} projects")
         
         # Test with actual tile loading (simplified)
         sample_files = file_list[:5]  # Test first 5 files
@@ -149,14 +139,14 @@ def test_real_data_loading():
             full_path = Path(tiles_root) / file_path
             if full_path.exists():
                 tile_data = np.load(full_path)
-                print(f"  ✓ Loaded {full_path.name}: {tile_data.shape}")
+                print(f"Loaded {full_path.name}: {tile_data.shape}")
             else:
-                print(f"  ✗ Missing {full_path}")
+                print(f"Missing {full_path}")
         
         return True
         
     except Exception as e:
-        print(f"✗ Data loading failed: {e}")
+        print(f"Failed: {e}")
         return False
 
 
@@ -176,24 +166,7 @@ def load_sample_labels(transcriptome_dataset):
 
 def test_if_adaptation_prep():
     """Test preparation for IF data adaptation."""
-    print("\nTesting IF data adaptation preparation...")
-    
-    print("✓ Current capabilities:")
-    print("  - H&E tile processing: Ready")
-    print("  - ResNet-50 features: Ready") 
-    print("  - Gene expression prediction: Ready")
-    
-    print("\n✓ IF adaptation requirements:")
-    print("  - Multi-channel IF images (DAPI, protein markers)")
-    print("  - Spatial coordinates preservation")
-    print("  - GeoMx region compatibility")
-    print("  - Immunofluorescence feature extraction")
-    
-    print("\n✓ Next steps for IF2RNA:")
-    print("  1. Multi-channel image preprocessing")
-    print("  2. IF-specific feature extractor (ResNet adaptation)")
-    print("  3. Spatial region mapping")
-    print("  4. GeoMx data format integration")
+    print("\nIF adaptation ready")
     
     return True
 
@@ -213,12 +186,7 @@ def main():
         test_if_adaptation_prep()
         
         print("\n" + "=" * 50)
-        print("🚀 STEP 4B COMPLETE!")
-        print("✓ Real data pipeline: READY")
-        print("✓ TCGA-like format: WORKING")
-        print("✓ Tile processing: WORKING")
-        print("✓ IF adaptation plan: READY")
-        print("\n🎯 Ready to proceed to Step 5: IF Data Adaptation!")
+        print("Tests passed")
         
         # Cleanup
         import shutil
@@ -230,7 +198,7 @@ def main():
         return 0
         
     except Exception as e:
-        print(f"\n✗ TEST FAILED: {str(e)}")
+        print(f"\nFailed: {e}")
         import traceback
         traceback.print_exc()
         return 1

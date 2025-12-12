@@ -1,6 +1,4 @@
-"""
-IF2RNA Experiment Manager: Configuration-driven training and evaluation
-"""
+
 
 import os
 import json
@@ -27,45 +25,31 @@ from .config import (
 
 
 class IF2RNAExperiment:
-    """Experiment manager for IF2RNA training and evaluation.
-    
-    Args:
-        config_path (str): Path to JSON configuration file
-        experiment_name (str): Name for this experiment
-        save_dir (str): Directory to save results
-    """
     
     def __init__(self, config_path=None, experiment_name=None, save_dir='experiments'):
         
-        # Set up experiment directory
         self.experiment_name = experiment_name or f"if2rna_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         self.save_dir = Path(save_dir) / self.experiment_name
         self.save_dir.mkdir(parents=True, exist_ok=True)
         
-        # Load configuration
         if config_path and os.path.exists(config_path):
             with open(config_path, 'r') as f:
                 config = json.load(f)
         else:
             config = {}
             
-        # Merge with defaults
         self.model_config = {**DEFAULT_MODEL_CONFIG, **config.get('model', {})}
         self.training_config = {**DEFAULT_TRAINING_CONFIG, **config.get('training', {})}
         self.data_config = {**DEFAULT_DATA_CONFIG, **config.get('data', {})}
         self.experiment_config = {**DEFAULT_EXPERIMENT_CONFIG, **config.get('experiment', {})}
         
-        # Set up logging
         self._setup_logging()
-        
-        # Initialize model
         self.model = None
         self.results = {}
         
         self.logger.info(f"Initialized IF2RNA experiment: {self.experiment_name}")
         
     def _setup_logging(self):
-        """Set up experiment logging."""
         log_file = self.save_dir / 'experiment.log'
         logging.basicConfig(
             level=logging.INFO,
@@ -78,7 +62,6 @@ class IF2RNAExperiment:
         self.logger = logging.getLogger(f'IF2RNA.{self.experiment_name}')
         
     def save_config(self):
-        """Save current configuration to file."""
         config = {
             'model': self.model_config,
             'training': self.training_config,
@@ -89,10 +72,9 @@ class IF2RNAExperiment:
         config_file = self.save_dir / 'config.json'
         with open(config_file, 'w') as f:
             json.dump(config, f, indent=2)
-        self.logger.info(f"Configuration saved to {config_file}")
+        print(f"Config saved to {config_file}")
         
     def create_model(self, input_dim=None, output_dim=None):
-        """Create IF2RNA model with current configuration."""
         config = self.model_config.copy()
         
         if input_dim is not None:

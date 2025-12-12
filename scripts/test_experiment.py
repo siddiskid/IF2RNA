@@ -128,7 +128,7 @@ def main():
         print("✓ Cross-validation: WORKING") 
         print("✓ Results logging: WORKING")
         print("✓ Model persistence: WORKING")
-        print("\n🎯 Ready for real HE2RNA data integration!")
+        print("Ready for data integration")
         
         return 0
         

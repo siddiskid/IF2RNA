@@ -354,7 +354,7 @@ def run_realistic_tcga_training():
         logdir='./realistic_tcga_logs'
     )
     
-    # Compute comprehensive metrics
+    # Compute metrics
     from if2rna.model import compute_correlations
     
     overall_corr = compute_correlations(labels, preds, val_projects)
@@ -414,13 +414,13 @@ def run_realistic_tcga_training():
     mean_corr = np.mean(gene_corrs)
     
     if mean_corr > 0.05:  # Reasonable for realistic synthetic data
-        print(f"\n🎉 EXCELLENT: Mean correlation {mean_corr:.4f} > 0.05")
+        print(f"Mean correlation {mean_corr:.4f}")
         success = True
     elif mean_corr > 0.0:
-        print(f"\n✅ GOOD: Mean correlation {mean_corr:.4f} > 0.0")
+        print(f"Mean correlation {mean_corr:.4f}")
         success = True
     else:
-        print(f"\n⚠️ MARGINAL: Mean correlation {mean_corr:.4f}")
+        print(f"Mean correlation {mean_corr:.4f}")
         success = True  # Still counts as working
     
     return success
@@ -437,19 +437,14 @@ def main():
                 shutil.rmtree(path)
         
         if success:
-            print(f"\n🚀 REALISTIC TCGA TRAINING: SUCCESS!")
-            print("✅ Model trains on realistic TCGA structure")
-            print("✅ Handles real sample IDs and projects")
-            print("✅ Project-specific patterns detected")
-            print("✅ Ready for actual TCGA data!")
-            print("✅ Architecture validated with realistic data")
+            print("Test passed")
             return 0
         else:
-            print(f"\n❌ REALISTIC TCGA TRAINING: ISSUES")
+            print("Test had issues")
             return 1
             
     except Exception as e:
-        print(f"\n✗ REALISTIC TRAINING FAILED: {str(e)}")
+        print(f"Test failed: {str(e)}")
         import traceback
         traceback.print_exc()
         return 1

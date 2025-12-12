@@ -1,10 +1,4 @@
-"""
-IF2RNA: Predicting Spatial Gene Expression from Immunofluorescence Imaging using Deep Learning
-"""
-
 __version__ = "0.1.0"
-
-# Import main components
 from .model import (
     IF2RNA, fit, evaluate, predict, training_epoch, MultiChannelResNet50,
     create_if2rna_model_6_channel, create_if2rna_model_50_channel, 

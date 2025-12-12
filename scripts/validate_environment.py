@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
-"""
-Environment validation script for IF2RNA project
-"""
 
 import sys
 import importlib.util
 
 def check_package(package_name, required_version=None):
-    """Check if package is installed and optionally verify version"""
     try:
         spec = importlib.util.find_spec(package_name)
         if spec is None:
@@ -20,7 +16,6 @@ def check_package(package_name, required_version=None):
         return False, str(e)
 
 def main():
-    """Validate environment setup"""
     print("IF2RNA Environment Validation")
     print("=" * 40)
     print(f"Python version: {sys.version}")
@@ -50,10 +45,9 @@ def main():
     
     print("\n" + "=" * 40)
     if all_good:
-        print("✓ Environment setup complete!")
-        print("Ready to proceed with HE2RNA baseline reproduction.")
+        print("Environment OK")
     else:
-        print("✗ Some packages missing. Please install missing dependencies.")
+        print("Missing packages")
         return 1
     
     return 0

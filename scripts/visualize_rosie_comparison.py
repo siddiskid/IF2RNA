@@ -1,25 +1,21 @@
 #!/usr/bin/env python3
-"""
-Create a visual comparison of ROSIE vs IF2RNA pipelines
-"""
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
 import numpy as np
+from pathlib import Path
 
 fig, axes = plt.subplots(3, 1, figsize=(14, 10))
 fig.suptitle('ROSIE + IF2RNA: Complementary Technologies', fontsize=16, fontweight='bold')
 
-# Color scheme
-color_he = '#FF6B6B'      # H&E
-color_if = '#4ECDC4'      # IF
-color_gene = '#45B7D1'    # Gene expression
-color_rosie = '#95E1D3'   # ROSIE
-color_if2rna = '#F38181'  # IF2RNA
+color_he = '#FF6B6B'
+color_if = '#4ECDC4'
+color_gene = '#45B7D1'
+color_rosie = '#95E1D3'
+color_if2rna = '#F38181'
 
 def draw_box(ax, x, y, width, height, text, color, alpha=0.8):
-    """Draw a colored box with text"""
     box = FancyBboxPatch((x, y), width, height, 
                          boxstyle="round,pad=0.05", 
                          facecolor=color, 
@@ -33,7 +29,6 @@ def draw_box(ax, x, y, width, height, text, color, alpha=0.8):
            wrap=True)
 
 def draw_arrow(ax, x1, y1, x2, y2, label=''):
-    """Draw an arrow between boxes"""
     arrow = FancyArrowPatch((x1, y1), (x2, y2),
                            arrowstyle='->', 
                            mutation_scale=30, 
@@ -124,7 +119,7 @@ ax3.text(6.5, 1.0, benefits_text,
         bbox=dict(boxstyle='round', facecolor='lightgreen', alpha=0.9, pad=0.5))
 
 plt.tight_layout()
-plt.savefig('/Users/siddarthchilukuri/Documents/GitHub/IF2RNA/docs/ROSIE_IF2RNA_Comparison.png', 
-           dpi=300, bbox_inches='tight')
-print("✅ Diagram saved to: docs/ROSIE_IF2RNA_Comparison.png")
+output_path = Path(__file__).parent.parent / 'docs' / 'ROSIE_IF2RNA_Comparison.png'
+plt.savefig(output_path, dpi=300, bbox_inches='tight')
+print(f"Saved to {output_path}")
 plt.show()
