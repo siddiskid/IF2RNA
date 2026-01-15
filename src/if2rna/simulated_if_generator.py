@@ -106,7 +106,7 @@ class SimulatedIFGenerator:
         cell_centers_x, cell_centers_y = cell_centers
         n_cells = len(cell_centers_x)
         
-        if spatial_clustering):
+        if spatial_clustering:
             n_hotspots = np.random.randint(1, 4)
             hotspot_centers = np.random.randint(0, self.image_size, (n_hotspots, 2))
             

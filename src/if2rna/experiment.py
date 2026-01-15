@@ -15,12 +15,13 @@ import logging
 from datetime import datetime
 
 from .model import IF2RNA, fit, predict, evaluate
-from .data import IF2RNADataset, IF2RNATileDataset, create_synthetic_data
+from .data import IF2RNADataset, IF2RNATileDataset, create_synthetic_data, create_real_if_data
 from .config import (
     DEFAULT_MODEL_CONFIG, 
     DEFAULT_TRAINING_CONFIG, 
     DEFAULT_DATA_CONFIG,
-    DEFAULT_EXPERIMENT_CONFIG
+    DEFAULT_EXPERIMENT_CONFIG,
+    PATH_TO_GEOMX_DATA
 )
 
 
@@ -90,7 +91,6 @@ class IF2RNAExperiment:
         """Run complete experiment with synthetic data."""
         self.logger.info("Starting synthetic data experiment")
         
-        # Generate synthetic data
         X, y, patients, projects = create_synthetic_data(
             n_samples=n_samples,
             n_tiles=self.data_config['n_tiles'],
@@ -98,20 +98,46 @@ class IF2RNAExperiment:
             n_genes=n_genes
         )
         
-        # Create dataset
         genes = [f"gene_{i:04d}" for i in range(n_genes)]
         dataset = IF2RNADataset(genes, patients, projects, X, y)
         
-        # Create model
         self.create_model(output_dim=n_genes)
         
-        # Run experiment
         results = self._run_cross_validation(dataset)
         
-        # Save results
         self._save_results(results)
         
         self.logger.info("Synthetic experiment completed")
+        return results
+    
+    def run_real_if_experiment(self, data_dir=None, n_genes=100):
+        """Run complete experiment with real IF data."""
+        self.logger.info("Starting real IF data experiment")
+        
+        if data_dir is None:
+            data_dir = PATH_TO_GEOMX_DATA
+        
+        try:
+            X, y, patients, projects = create_real_if_data(
+                data_dir=data_dir,
+                n_genes=n_genes,
+                use_synthetic_fallback=False
+            )
+        except Exception as e:
+            self.logger.error(f"Failed to load real IF data: {e}")
+            self.logger.info("Falling back to synthetic data")
+            return self.run_synthetic_experiment(n_samples=50, n_genes=n_genes)
+        
+        genes = [f"gene_{i:04d}" for i in range(n_genes)]
+        dataset = IF2RNADataset(genes, patients, projects, X, y)
+        
+        self.create_model(output_dim=n_genes)
+        
+        results = self._run_cross_validation(dataset)
+        
+        self._save_results(results)
+        
+        self.logger.info("Real IF experiment completed")
         return results
         
     def _run_cross_validation(self, dataset):

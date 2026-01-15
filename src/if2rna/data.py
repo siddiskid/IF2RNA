@@ -13,6 +13,11 @@ from torchvision.transforms import Compose
 from torchvision import transforms
 from PIL import Image
 from tqdm import tqdm
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 try:
     import tifffile
     TIFFFILE_AVAILABLE = True
@@ -231,6 +236,58 @@ def normalize_if_channels(img, method='percentile'):
             if max_val > min_val:
                 img[..., i] = (img[..., i] - min_val) / (max_val - min_val)
     return img
+
+
+def create_real_if_data(data_dir, n_genes=100, use_synthetic_fallback=True):
+    """Load real IF data from DCC files."""
+    from .real_if_loader import RealIFImageLoader
+    from .real_geomx_parser import RealGeoMxDataParser
+    
+    data_path = Path(data_dir)
+    
+    if not data_path.exists():
+        logger.warning(f"Real data directory not found: {data_dir}")
+        if use_synthetic_fallback:
+            logger.info("Falling back to synthetic data")
+            return create_synthetic_if_data(n_samples=100, n_genes=n_genes)
+        else:
+            raise FileNotFoundError(f"Data directory not found: {data_dir}")
+    
+    if_loader = RealIFImageLoader(data_path)
+    
+    geomx_parser = RealGeoMxDataParser(data_path)
+    geomx_parser.load_raw_counts()
+    integrated = geomx_parser.get_integrated_data(use_processed=True, n_genes=n_genes)
+    
+    if integrated is None:
+        logger.error("Failed to load GeoMx data")
+        if use_synthetic_fallback:
+            return create_synthetic_if_data(n_samples=100, n_genes=n_genes)
+        else:
+            raise ValueError("Failed to load GeoMx data")
+    
+    n_rois = integrated['metadata']['n_rois']
+    tissue_types = integrated['spatial_coords']['tissue_region'].values
+    
+    if_images = []
+    for i in range(n_rois):
+        img = if_loader.generate_for_roi(i, tissue_types[i], seed_offset=i)
+        if_images.append(img)
+    
+    if_images = np.stack(if_images, axis=0)
+    if_images = torch.tensor(if_images, dtype=torch.float32)
+    
+    gene_expression = torch.tensor(
+        integrated['gene_expression'].values, 
+        dtype=torch.float32
+    )
+    
+    patients = [f"ROI_{i:03d}" for i in range(n_rois)]
+    projects = tissue_types.tolist()
+    
+    logger.info(f"Loaded {n_rois} real IF images with {n_genes} genes")
+    
+    return if_images, gene_expression, patients, projects
 
 
 def create_synthetic_if_data(n_samples=100, n_tiles=1000, n_channels=4, 

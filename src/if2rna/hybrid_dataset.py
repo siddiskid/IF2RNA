@@ -11,26 +11,24 @@ logger = logging.getLogger(__name__)
 
 class HybridIF2RNADataset(Dataset):
     
-    def __init__(self, integrated_data, if_generator, n_tiles_per_roi=16):
+    def __init__(self, integrated_data, if_generator, n_tiles_per_roi=16, use_real_if=False):
         self.roi_ids = integrated_data['roi_ids']
-        self.gene_expression = integrated_data['gene_expression']  # DataFrame or array
+        self.gene_expression = integrated_data['gene_expression']
         self.gene_names = integrated_data['gene_names']
         self.spatial_coords = integrated_data['spatial_coords']
         self.metadata = integrated_data['metadata']
         
         self.if_generator = if_generator
         self.n_tiles_per_roi = n_tiles_per_roi
+        self.use_real_if = use_real_if
         
-        # Convert expression to numpy if pandas
         if hasattr(self.gene_expression, 'values'):
             self.expression_array = self.gene_expression.values
         else:
             self.expression_array = np.array(self.gene_expression)
         
-        # Get tissue types for each ROI
         self.tissue_types = self.spatial_coords['tissue_region'].values
         
-        # Total samples = n_rois * n_tiles_per_roi
         self.n_rois = len(self.roi_ids)
         self.total_samples = self.n_rois * self.n_tiles_per_roi
         
@@ -40,27 +38,30 @@ class HybridIF2RNADataset(Dataset):
         logger.info(f"  - {self.n_tiles_per_roi} tiles per ROI")
         logger.info(f"  - Total samples: {self.total_samples}")
         logger.info(f"  - Tissue types: {np.unique(self.tissue_types)}")
+        logger.info(f"  - Using real IF data: {self.use_real_if}")
         
     def __len__(self):
         return self.total_samples
     
     def __getitem__(self, idx):
-        # Map flat index to (roi, tile)
         roi_idx = idx // self.n_tiles_per_roi
         tile_idx = idx % self.n_tiles_per_roi
         
-        # Get tissue type and expression for this ROI
         tissue_type = self.tissue_types[roi_idx]
         expression = self.expression_array[roi_idx]
         
-        # Generate simulated IF image
-        # Use tile_idx as seed offset for variability within ROI
-        if_image = self.if_generator.generate_for_tissue_type(
-            tissue_type, 
-            seed_offset=idx
-        )
+        if self.use_real_if:
+            if_image = self.if_generator.generate_for_roi(
+                roi_idx, 
+                tissue_type,
+                seed_offset=tile_idx
+            )
+        else:
+            if_image = self.if_generator.generate_for_tissue_type(
+                tissue_type, 
+                seed_offset=idx
+            )
         
-        # Convert to torch tensors
         if_image_tensor = torch.from_numpy(if_image).float()
         expression_tensor = torch.from_numpy(expression).float()
         
@@ -75,17 +76,14 @@ class HybridIF2RNADataset(Dataset):
 
 
 class AggregatedIF2RNADataset(Dataset):
-    """
-    Dataset where multiple tiles are aggregated per ROI.
-    This matches the HE2RNA paper's approach of aggregating features.
-    """
     
-    def __init__(self, integrated_data, if_generator, n_tiles_per_roi=16):
+    def __init__(self, integrated_data, if_generator, n_tiles_per_roi=16, use_real_if=False):
         """
         Args:
             integrated_data: Output from RealGeoMxDataParser.get_integrated_data()
-            if_generator: SimulatedIFGenerator instance
+            if_generator: IF generator instance (SimulatedIFGenerator or RealIFImageLoader)
             n_tiles_per_roi: Number of image tiles to generate per ROI
+            use_real_if: Whether to use real IF data loader interface
         """
         self.roi_ids = integrated_data['roi_ids']
         self.gene_expression = integrated_data['gene_expression']
@@ -95,14 +93,13 @@ class AggregatedIF2RNADataset(Dataset):
         
         self.if_generator = if_generator
         self.n_tiles_per_roi = n_tiles_per_roi
+        self.use_real_if = use_real_if
         
-        # Convert expression to numpy if pandas
         if hasattr(self.gene_expression, 'values'):
             self.expression_array = self.gene_expression.values
         else:
             self.expression_array = np.array(self.gene_expression)
         
-        # Get tissue types
         self.tissue_types = self.spatial_coords['tissue_region'].values
         
         self.n_rois = len(self.roi_ids)
@@ -111,6 +108,7 @@ class AggregatedIF2RNADataset(Dataset):
         logger.info(f"  - {self.n_rois} ROIs")
         logger.info(f"  - {len(self.gene_names)} genes")
         logger.info(f"  - {self.n_tiles_per_roi} tiles per ROI (aggregated)")
+        logger.info(f"  - Using real IF data: {self.use_real_if}")
         
     def __len__(self):
         return self.n_rois
@@ -129,18 +127,23 @@ class AggregatedIF2RNADataset(Dataset):
         tissue_type = self.tissue_types[idx]
         expression = self.expression_array[idx]
         
-        # Generate multiple tiles for this ROI
         tiles = []
         for tile_idx in range(self.n_tiles_per_roi):
-            tile = self.if_generator.generate_for_tissue_type(
-                tissue_type,
-                seed_offset=idx * self.n_tiles_per_roi + tile_idx
-            )
+            if self.use_real_if:
+                tile = self.if_generator.generate_for_roi(
+                    idx,
+                    tissue_type,
+                    seed_offset=tile_idx
+                )
+            else:
+                tile = self.if_generator.generate_for_tissue_type(
+                    tissue_type,
+                    seed_offset=idx * self.n_tiles_per_roi + tile_idx
+                )
             tiles.append(tile)
         
         tiles_array = np.stack(tiles, axis=0)
         
-        # Convert to tensors
         tiles_tensor = torch.from_numpy(tiles_array).float()
         expression_tensor = torch.from_numpy(expression).float()
         

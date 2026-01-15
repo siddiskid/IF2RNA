@@ -4,6 +4,7 @@ torchvision>=0.8.0
 numpy>=1.19.0
 scikit-learn>=0.24.0
 pandas>=1.2.0
+scipy>=1.7.0
 
 # Image Processing
 opencv-python>=4.5.0
@@ -22,8 +23,8 @@ joblib>=1.0.0
 tensorflow>=2.4.0
 keras>=2.4.0
 
-# Color correction (for HE2RNA compatibility)
-colorcorrect>=0.3.0
+# Color correction (optional, requires C++ compiler)
+# colorcorrect>=0.3.0  # Commented out - requires C++ build tools
 
 # CUDA K-means (optional, for supertile preprocessing)
 # libKMCUDA>=6.2.2  # Uncomment if CUDA available
